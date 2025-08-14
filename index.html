@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mini Chatbot con Hugging Face</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f2f2f2; display: flex; justify-content: center; }
+  #container { width: 100%; max-width: 600px; background: white; border-radius: 10px; padding: 15px; margin-top: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+  #chat { height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #fafafa; }
+  .msg { margin: 8px 0; padding: 8px; border-radius: 5px; max-width: 80%; }
+  .user { background: #d0ebff; align-self: flex-end; }
+  .bot { background: #d8f5d8; align-self: flex-start; }
+  #inputArea { display: flex; margin-top: 10px; }
+  #userInput { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+  button { padding: 10px; margin-left: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+  button:hover { background: #0056b3; }
+  select { margin-bottom: 10px; padding: 5px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<div id="container">
+  <h2>💬 Mini Chatbot con Hugging Face</h2>
+  
+  <!-- Selector de modelo -->
+  <label for="modelSelect">Modelo:</label>
+  <select id="modelSelect">
+    <option value="mistralai/Mistral-7B-Instruct-v0.2">Mistral-7B Instruct</option>
+    <option value="tiiuae/falcon-7b-instruct">Falcon-7B Instruct</option>
+    <option value="meta-llama/Meta-Llama-3-8B-Instruct">Meta LLaMA-3 8B</option>
+  </select>
+
+  <div id="chat"></div>
+  
+  <div id="inputArea">
+    <input type="text" id="userInput" placeholder="Escribe tu mensaje...">
+    <button onclick="sendMessage()">Enviar</button>
+  </div>
+</div>
+
+<script>
+const API_TOKEN = "PON_AQUI_TU_TOKEN"; // Tu token de Hugging Face
+let chatHistory = [];
+
+async function sendMessage() {
+  const input = document.getElementById("userInput");
+  const chat = document.getElementById("chat");
+  const model = document.getElementById("modelSelect").value;
+
+  const userMsg = input.value.trim();
+  if (!userMsg) return;
+
+  // Agregar mensaje del usuario al historial y mostrarlo
+  chatHistory.push({ role: "user", content: userMsg });
+  appendMessage(userMsg, "user");
+  input.value = "";
+
+  // Mostrar que el bot está pensando
+  const thinkingMsg = appendMessage("🤖 Pensando...", "bot");
+
+  // Preparar el prompt juntando historial
+  const fullPrompt = chatHistory.map(m => 
+    (m.role === "user" ? "Usuario: " : "Bot: ") + m.content
+  ).join("\n") + "\nBot:";
+
+  // Llamada a la API de Hugging Face
+  const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+    method: "POST",
+    headers: { 
+      "Authorization": `Bearer ${API_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      inputs: fullPrompt,
+      parameters: { max_new_tokens: 200 }
+    })
+  });
+
+  const data = await response.json();
+  chat.removeChild(thinkingMsg);
+
+  let botReply = "";
+  if (Array.isArray(data) && data[0]?.generated_text) {
+    botReply = data[0].generated_text.split("Bot:").pop().trim();
+  } else {
+    botReply = "No entendí tu mensaje.";
+  }
+
+  chatHistory.push({ role: "bot", content: botReply });
+  appendMessage(botReply, "bot");
+}
+
+// Función para agregar mensajes al chat
+function appendMessage(text, sender) {
+  const chat = document.getElementById("chat");
+  const msgDiv = document.createElement("div");
+  msgDiv.className = "msg " + sender;
+  msgDiv.innerHTML = text;
+  chat.appendChild(msgDiv);
+  chat.scrollTop = chat.scrollHeight; // Scroll automático
+  return msgDiv;
+}
+</script>
+</body>
+</html>
